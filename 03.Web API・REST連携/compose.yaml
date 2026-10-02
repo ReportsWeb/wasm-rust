@@ -1,7 +1,7 @@
 name: reports-web-rust-03
 services:
   engine:
-    image: ghcr.io/reportsweb/engine:1.0.0
+    image: ghcr.io/reportsweb/engine:1.0.1
     healthcheck:
       test:
       - CMD
@@ -109,7 +109,7 @@ services:
       timeout: 3s
       retries: 30
   runtime:
-    image: ghcr.io/reportsweb/engine:1.0.0
+    image: ghcr.io/reportsweb/engine:1.0.1
     user: root
     command:
     - export-runtime
