@@ -538,6 +538,7 @@ dependencies = [
  "anyhow",
  "axum",
  "reports-web",
+ "reqwest",
  "serde_json",
  "tokio",
  "tower-http",
