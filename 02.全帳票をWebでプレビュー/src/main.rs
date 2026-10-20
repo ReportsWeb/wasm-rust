@@ -17,7 +17,7 @@ use tokio::sync::Semaphore;
 use tower_http::services::{ServeDir, ServeFile};
 
 const BASE: &str = "/demo/reports.web/samples/rust";
-const MAX: usize = 32 * 1024 * 1024;
+const MAX: usize = 64 * 1024 * 1024;
 
 #[derive(Clone)]
 struct AppState {
@@ -213,7 +213,6 @@ async fn server_pdf(
         return Err(AppError::bad_request("未対応の操作です。"));
     }
     let sample = p.sample.as_deref().unwrap_or("invoice");
-    assert_sample(sample)?;
     let _slot = s.render_slot.clone().try_acquire_owned().map_err(|_| {
         AppError(
             StatusCode::TOO_MANY_REQUESTS,
@@ -239,7 +238,7 @@ async fn server_pdf(
     if payload.len() > MAX {
         return Err(AppError(
             StatusCode::PAYLOAD_TOO_LARGE,
-            "展開後の印刷データが32MiBを超えます。".into(),
+            "展開後の印刷データが64MiBを超えます。".into(),
         ));
     }
     // reports-web: POST /render/pdf to the Reports.Web engine.

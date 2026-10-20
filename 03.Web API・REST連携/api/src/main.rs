@@ -17,7 +17,7 @@ use tokio::sync::Semaphore;
 use tower_http::services::{ServeDir, ServeFile};
 
 const BASE: &str = "/demo/reports.web/samples/rust";
-const MAX: usize = 32 * 1024 * 1024;
+const MAX: usize = 64 * 1024 * 1024;
 
 #[derive(Clone)]
 struct AppState {
@@ -213,7 +213,6 @@ async fn server_pdf(
         return Err(AppError::bad_request("未対応の操作です。"));
     }
     let sample = p.sample.as_deref().unwrap_or("invoice");
-    assert_sample(sample)?;
     let _slot = s.render_slot.clone().try_acquire_owned().map_err(|_| {
         AppError(
             StatusCode::TOO_MANY_REQUESTS,
@@ -239,7 +238,7 @@ async fn server_pdf(
     if payload.len() > MAX {
         return Err(AppError(
             StatusCode::PAYLOAD_TOO_LARGE,
-            "展開後の印刷データが32MiBを超えます。".into(),
+            "展開後の印刷データが64MiBを超えます。".into(),
         ));
     }
     // reports-web: POST /render/pdf to the Reports.Web engine.
@@ -351,6 +350,34 @@ fn externalize_print_data(v: &mut Value, sample: &str, base: &str) {
     }
 }
 
+/// B18: an image embedded in a definition belongs in ImageDataBase64. A data: URI in
+/// ImagePath made the Pure Java SDK refuse the whole PREPEJ and WPF throw PathTooLongException.
+fn embed_data_uri_image(object: &mut serde_json::Map<String, Value>) {
+    let Some(path) = object.get("ImagePath").and_then(Value::as_str) else { return };
+    let Some(rest) = path.strip_prefix("data:image/") else { return };
+    let Some(comma) = rest.find(',') else { return };
+    if !rest[..comma].ends_with(";base64") {
+        return;
+    }
+    let data = rest[comma + 1..].to_owned();
+    object.insert("ImagePath".into(), Value::String(String::new()));
+    object.insert("ImageDataBase64".into(), Value::String(data));
+}
+
+#[cfg(test)]
+mod image_embedding_tests {
+    use super::*;
+    #[test]
+    fn data_uri_image_path_moves_to_image_data_base64() {
+        let mut v = json!({"ImagePath": "data:image/png;base64,AQID", "ImageDataBase64": ""});
+        embed_data_uri_image(v.as_object_mut().unwrap());
+        assert_eq!(v, json!({"ImagePath": "", "ImageDataBase64": "AQID"}));
+        let mut path = json!({"ImagePath": "kakuin.png"});
+        embed_data_uri_image(path.as_object_mut().unwrap());
+        assert_eq!(path["ImagePath"], "kakuin.png");
+    }
+}
+
 async fn inline_assets(v: &mut Value, s: &AppState) -> Result<(), AppError> {
     let own = s.asset_base.clone();
     let trusted = s.trusted_asset_bases.clone();
@@ -384,7 +411,7 @@ fn inline_walk<'a>(
                 }
             }
             Value::Object(values) => {
-                for (key, value) in values {
+                for (key, value) in values.iter_mut() {
                     inline_walk(value, s, own, trusted, depth + 1).await?;
                     if key == "ImagePath"
                         && value
@@ -396,6 +423,7 @@ fn inline_walk<'a>(
                         ));
                     }
                 }
+                embed_data_uri_image(values);
             }
             _ => {}
         }

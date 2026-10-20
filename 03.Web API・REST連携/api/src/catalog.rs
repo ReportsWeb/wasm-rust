@@ -80,6 +80,15 @@ impl SampleCatalog {
         if sample == "quick-start" {
             p.set_value("Text2", "Webブラウザで作った\n印刷データです。")?;
         }
+        // 名刺は 5 段。繰返しの物体は、何も書かないと 1 段目にしか描かない（原本と同じ、D-37）。
+        // 各段に定義の文字をそのまま書く。
+        if sample == "business-card" {
+            for o in d["Objects"].as_array().into_iter().flatten() {
+                for i in 0..repeat(o) {
+                    p.set_value_at(&s(o, "Name"), s(o, "Text"), i, true)?;
+                }
+            }
+        }
         p.page_end()?;
         Ok(p)
     }
@@ -102,7 +111,7 @@ impl SampleCatalog {
                 let i = (page - 1) * 15 + line + 1;
                 p.set_value_at("行番号", i, line, true)?
                     .set_value_at("10倍数", i * 10, line, true)?
-                    .set_value_at("横線", "", line, true)?;
+                    .set_value_at("横線", Value::Null, line, true)?; // 罫線・枠は値を書かずに描く（"" を書くと描かない。原本と同じ、D-33）
                 // 100で割り切れる値だけ、この行の文字色を青にする。
                 if (i * 10) % 100 == 0 { p.change_attributes("10倍数", json!({"foreground":"#FF0000FF"}), line)?; }
             }
@@ -126,9 +135,9 @@ impl SampleCatalog {
                 p.set_value_at("郵便番号", at(&v, 0), i, true)?
                     .set_value_at("市区町村", at(&v, 1), i, true)?
                     .set_value_at("住所", at(&v, 2), i, true)?
-                    .set_value_at("横罫線", "", i, true)?;
+                    .set_value_at("横罫線", Value::Null, i, true)?;
                 if page >= 5 && i % 2 == 1 {
-                    p.set_value_at("網掛け", "", i, true)?;
+                    p.set_value_at("網掛け", Value::Null, i, true)?;
                 }
             }
             if page < 5 {
@@ -186,8 +195,11 @@ impl SampleCatalog {
                     "数量青",
                     "単価青",
                     "金額青",
+                    // 品名青・単価青と同じ位置の帯。何も書かないと 1 行目にしか描かない（D-37）。
+                    "Square5",
+                    "Square10",
                 ] {
-                    p.set_value_at(n, "", i, true)?;
+                    p.set_value_at(n, Value::Null, i, true)?;
                 }
             }
             for (i, r) in matching(&details, "見積番号", &s(h, "見積番号"))
@@ -241,8 +253,8 @@ impl SampleCatalog {
                 next_x = x + (f(base, "Width") + adjust[j]) * px;
             }
             for i in 0..max_h {
-                p.set_value_at("hLine", "", i, true)?
-                    .set_value_at("LineRect", "", i, true)?;
+                p.set_value_at("hLine", Value::Null, i, true)?
+                    .set_value_at("LineRect", Value::Null, i, true)?;
                 if i == 0 {
                     p.change_attributes("hLine", json!({"borderWidth":0.5*px}), i)?;
                 }
@@ -266,7 +278,7 @@ impl SampleCatalog {
                 }
             }
             for j in 0..=max_v {
-                p.set_value_at("vLine", "", j, true)?.change_attributes(
+                p.set_value_at("vLine", Value::Null, j, true)?.change_attributes(
                     "vLine",
                     json!({"x":if j<max_v {column_x[j]} else {next_x}}),
                     j,
@@ -311,7 +323,7 @@ impl SampleCatalog {
             }
             p.set_value("txtTotal", invoice_number(&json!(total as f64 + tax))?)?
                 .change_attributes("hLine", json!({"strokeStyle":"Double"}), max_h - 3)?
-                .set_value_at("hLine", "", max_h, true)?
+                .set_value_at("hLine", Value::Null, max_h, true)?
                 .change_attributes("hLine", json!({"borderWidth":0.5*px}), max_h)?
                 .page_end()?;
         }
@@ -398,7 +410,7 @@ impl SampleCatalog {
                     p.set_value_at(n, r[n].as_str().unwrap_or("").to_owned(), i, true)?;
                 }
                 for n in ["枠_大分類", "枠_小分類", "枠_品番", "枠_品名"] {
-                    p.set_value_at(n, "", i, true)?;
+                    p.set_value_at(n, Value::Null, i, true)?;
                     if r["kind"] != "detail" {
                         p.change_attributes(n,json!({"background":if r["kind"]=="small"{"#FFFFFFE0"}else{"#FFFFB6C1"},"fillEnabled":true,"fillStyle":"Solid"}),i)?;
                     }
