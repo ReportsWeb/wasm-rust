@@ -1025,7 +1025,7 @@ dependencies = [
 name = "reports-web"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1f8f1a257ebde03e184d61c422a52f14ec159c310af238798991d300e17cf3a"
+checksum = "1995779e783d763879bdaf3782ce6e584bcb2a1653a4a22bd6e3c8ea515451e0"
 dependencies = [
  "anyhow",
  "reqwest",
