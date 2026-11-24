@@ -37,7 +37,7 @@ rust、database、engineが `Up`（起動中）になっていることを確認
 
 このURLは、お使いのパソコン内で今起動したサーバーの入口です。公開デモサイトではないため、起動前にURLだけ開いても動きません。ポートを外部へ開放する設定も不要です。
 
-同梱の `.\Start.ps1`（Windows）／`sh start.sh`（macOS・Linux）でも、上と同じDockerコマンドを実行できます。
+同じフォルダーの `.\Start.ps1`（Windows）／`sh start.sh`（macOS・Linux）でも、上と同じDockerコマンドを実行できます。
 
 ## 3. 画面で確かめる
 
@@ -77,7 +77,7 @@ docker compose up -d --build --wait --wait-timeout 180
 |場所|役割|
 |---|---|
 |`src/catalog.rs`|帳票を作る中心部分。`invoice()`は請求書、`estimate()`は見積書、`rows()`はSQLによるデータ取得|
-|`src/lib.rs`|値、明細、ページを印刷データへまとめるRustの帳票データ組み立て処理|
+|クレート [`reports-web`](https://crates.io/crates/reports-web) の `PrintData`|値、明細、ページを印刷データへまとめるRustの帳票データ組み立て処理|
 |`src/main.rs`|HTTP要求を受け、印刷データ・PDFを返す入口|
 |`resources/definitions/`|帳票ごとのデザイン（PREPDJ）|
 |`resources/images/`|角印などの画像|
@@ -85,7 +85,7 @@ docker compose up -d --build --wait --wait-timeout 180
 |`compose.yaml`|このサンプルで起動するサービスと接続先|
 |`Dockerfile`|Rustの実行環境の作り方|
 
-まず`catalog.rs`の`invoice()`を読み、分からない呼び出しを`lib.rs`で調べてください。データ取得を調べる場合は`rows()`を読みます。
+まず`catalog.rs`の`invoice()`を読み、分からない呼び出しをクレート `reports-web` の `PrintData`で調べてください。データ取得を調べる場合は`rows()`を読みます。
 
 デザインは`resources/definitions/invoice.prepdj`をReports Webデザイナーで開いて編集できます。保存先をこのファイルに戻してから、第4節のコマンドで再ビルドし、帳票をもう一度読み込みます。請求書はRust側でも明細の色や幅を指定しているため、それらの変更は`invoice()`も確認してください。
 
@@ -121,7 +121,7 @@ docker compose down --volumes
 
 このサンプルのコンテナーとネットワーク、試用中のDBデータを削除します。編集したRustや帳票定義は消えません。別の01・02・03は停止しません。次に起動すると同じ初期データが自動で入ります。DBを残して一時停止するだけなら`docker compose stop`を使います。
 
-同梱の `.\Stop.ps1`／`sh stop.sh`でも同じ操作ができます。
+同じフォルダーの `.\Stop.ps1`／`sh stop.sh`でも同じ操作ができます。
 
 ### サンプル用イメージも削除して、最初から試す
 
