@@ -137,7 +137,7 @@ impl SampleCatalog {
                     .set_value_at("住所", at(&v, 2), i, true)?
                     .set_value_at("横罫線", Value::Null, i, true)?;
                 if page >= 5 && i % 2 == 1 {
-                    p.set_value_at("網掛け", Value::Null, i, true)?;
+                    p.set_value_at("網掛け", Value::Null, i / 2, true)?;
                 }
             }
             if page < 5 {
