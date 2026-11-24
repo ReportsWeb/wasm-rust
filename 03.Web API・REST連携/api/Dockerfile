@@ -1,4 +1,5 @@
 FROM rust:1.94-bookworm AS build
+ENV CARGO_BUILD_JOBS=2 RAYON_NUM_THREADS=2
 WORKDIR /work
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src

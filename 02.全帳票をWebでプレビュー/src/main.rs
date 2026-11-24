@@ -28,6 +28,7 @@ struct AppState {
     designer_url: String,
     asset_base: String,
     trusted_asset_bases: Arc<Vec<String>>,
+    engine_url: String,
     engine: reports_web::ReportsWebEngine,
     render_slot: Arc<Semaphore>,
 }
@@ -72,6 +73,10 @@ async fn main() -> anyhow::Result<()> {
                 .map(str::to_owned)
                 .collect(),
         ),
+        engine_url: env::var("REPORTS_ENGINE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:3107".into())
+            .trim_end_matches('/')
+            .into(),
         engine: reports_web::ReportsWebEngine::with_timeout(
             &env::var("REPORTS_ENGINE_URL").unwrap_or_else(|_| "http://127.0.0.1:3107".into()),
             Duration::from_secs(90),
@@ -207,8 +212,17 @@ async fn api(State(s): State<AppState>, Query(p): Query<Params>) -> Result<Respo
 async fn server_pdf(
     State(s): State<AppState>,
     Query(p): Query<Params>,
-    body: Bytes,
+    body: Result<Bytes, axum::extract::rejection::BytesRejection>,
 ) -> Result<Response, AppError> {
+    let body = body.map_err(|error| {
+        let status = error.status();
+        let message = if status == StatusCode::PAYLOAD_TOO_LARGE {
+            "印刷データは64MiB以内にしてください。"
+        } else {
+            "要求の本文を読み込めません。"
+        };
+        AppError(status, message.into())
+    })?;
     if p.action.as_deref() != Some("server-pdf") {
         return Err(AppError::bad_request("未対応の操作です。"));
     }
@@ -308,6 +322,12 @@ fn mime(name: &str) -> &'static str {
     }
 }
 
+/// OP-IMGSRC：http・https の URL は断らずにエンジンへ渡す（読むかどうかはエンジンの PAO_REPORTS_IMAGE_URL_HOSTS が決める）。
+fn is_http_url(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    lower.starts_with("http://") || lower.starts_with("https://")
+}
+
 async fn asset(s: &AppState, name: &str) -> Result<Vec<u8>, AppError> {
     if !matches!(name, "kakuin.png" | "estimate-header.jpg") {
         return Err(AppError::bad_request("未登録の画像資源です。"));
@@ -388,7 +408,7 @@ fn inline_walk<'a>(
                     if key == "ImagePath"
                         && value
                             .as_str()
-                            .is_some_and(|x| !x.is_empty() && !x.starts_with("data:"))
+                            .is_some_and(|x| !x.is_empty() && !x.starts_with("data:") && !is_http_url(x))
                     {
                         return Err(AppError::bad_request(
                             "外部画像は、このサンプルに登録した画像か埋め込み画像を使用してください。",
@@ -413,8 +433,28 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(value: E) -> Self {
+        // 例外の文字列や内部パスは応答へ出さず、サーバーのログにだけ残す。
         let e: anyhow::Error = value.into();
-        Self(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())
+        eprintln!("Request failed: {e:#}");
+        Self(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "処理に失敗しました。サーバーのログを確認してください。".into(),
+        )
+    }
+}
+// エンジン停止は502、90秒の時間切れは504。
+fn engine_failure(e: reqwest::Error) -> AppError {
+    eprintln!("PDF engine request failed (timeout={})", e.is_timeout());
+    if e.is_timeout() {
+        AppError(
+            StatusCode::GATEWAY_TIMEOUT,
+            "PDF作成エンジンが時間内に応答しませんでした。".into(),
+        )
+    } else {
+        AppError(
+            StatusCode::BAD_GATEWAY,
+            "PDF作成エンジンに接続できませんでした。".into(),
+        )
     }
 }
 impl IntoResponse for AppError {

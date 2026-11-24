@@ -1,4 +1,5 @@
 FROM rust:1.94-alpine AS build
+ENV CARGO_BUILD_JOBS=2 RAYON_NUM_THREADS=2
 RUN apk add --no-cache musl-dev
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
